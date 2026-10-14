@@ -19,12 +19,11 @@ import {
   Users,
   Wallet,
   X,
-  Trash2,
 } from "lucide-react";
 import { authEnabled, signOut } from "@/lib/auth/client";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { SecurityPanel } from "@/components/sonu/security";
-import { ensureOffice, exportBackup, fetchDatabase, fetchWorkspace, setTripStatus, archiveTruck } from "@/lib/sonu/api";
+import { ensureOffice, exportBackup, fetchDatabase, fetchWorkspace, setTripStatus } from "@/lib/sonu/api";
 import { STATUS_TRANSITIONS, TRIP_STATUS_LABEL, TRUCK_STATUS_LABEL } from "@/lib/sonu/permissions";
 import { printTripSheet } from "@/lib/sonu/print";
 import { formatDay, formatWhen, todayIst } from "@/lib/sonu/time";
@@ -265,18 +264,6 @@ export function Dashboard() {
     }
   }
 
-  async function archiveTruckHandler(truck: Truck) {
-    if (!window.confirm(`Remove ${truck.name} (${truck.plate}) from the fleet?\n\nIt will be archived and hidden from normal lists. You can restore it later if needed.`)) return;
-    setError("");
-    try {
-      await archiveTruck({ data: { id: truck.id, archived: true, acknowledge: true } });
-      setNotice(`${truck.plate} has been removed from the active fleet.`);
-      await refresh();
-    } catch (e) {
-      setError(messageOf(e, "Could not remove the truck."));
-    }
-  }
-
   async function leave() {
     setSigningOut(true);
     try {
@@ -360,6 +347,17 @@ export function Dashboard() {
                     {step.label}
                   </button>
                 ))}
+                {trip.status !== "cancelled" && trip.status !== "closed" && (
+                  <button
+                    type="button"
+                    className="danger-btn small-btn"
+                    disabled={busyTrip === trip.id}
+                    onClick={() => void moveTrip(trip, "cancelled")}
+                    title="Remove / cancel this trip"
+                  >
+                    <Trash2 size={14} /> Remove
+                  </button>
+                )}
                 <button type="button" className="secondary-btn small-btn" onClick={() => printTripSheet(data, trip.id)}>
                   Print
                 </button>
@@ -620,11 +618,11 @@ export function Dashboard() {
                 <section className="panel table-panel">
                   <PanelHead title="Fleet register" subtitle={`${data.trucks.length} registered vehicles`} onAdd={() => openModal("truck")} addLabel="Add truck" />
                   <DataTable
-                    headers={["Vehicle", "Registration", "Capacity", "Availability", "Current / next trip", "Trips", "Service hold", "Actions"]}
+                    headers={["Vehicle", "Registration", "Capacity", "Availability", "Current / next trip", "Trips", "Service hold"]}
                     numeric={[5]}
                     empty={{ title: "Your fleet starts here", detail: "Add your first truck to see availability and assignments." }}
                     rows={data.trucks
-                      .filter((truck) => !truck.archivedAt && hit(truck.name, truck.plate, truckLive(data, truck)))
+                      .filter((truck) => hit(truck.name, truck.plate, truckLive(data, truck)))
                       .map((truck) => {
                         const live = truckLive(data, truck);
                         return {
@@ -639,16 +637,6 @@ export function Dashboard() {
                             truckTripNote(data, truck),
                             data.trips.filter((trip) => trip.truckId === truck.id && trip.status !== "cancelled").length,
                             truck.serviceHold ? "On hold" : "No",
-                            <div key="actions" className="row-actions">
-                              <button
-                                type="button"
-                                className="danger-btn small-btn"
-                                onClick={() => void archiveTruckHandler(truck)}
-                                title="Remove from fleet"
-                              >
-                                <Trash2 size={14} /> Remove
-                              </button>
-                            </div>,
                           ],
                         };
                       })}
