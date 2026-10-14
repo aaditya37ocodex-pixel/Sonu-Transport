@@ -139,6 +139,7 @@ export function Dashboard() {
   const [query, setQuery] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
   const [modal, setModal] = useState<ModalKind | null>(null);
+  const [editing, setEditing] = useState<Record<string, any> | null>(null);
   const [returnTo, setReturnTo] = useState<ModalKind | null>(null);
   const [modalError, setModalError] = useState("");
   const [needsOverride, setNeedsOverride] = useState(false);
@@ -189,11 +190,12 @@ export function Dashboard() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const openModal = useCallback((kind: ModalKind, back: ModalKind | null = null) => {
+  const openModal = useCallback((kind: ModalKind, back: ModalKind | null = null, record: Record<string, any> | null = null) => {
     setModalError("");
     setNeedsOverride(false);
     setReturnTo(back);
     setNotice("");
+    setEditing(record);
     setModal(kind);
   }, []);
 
@@ -201,6 +203,7 @@ export function Dashboard() {
     setModal(null);
     setReturnTo(null);
     setModalError("");
+    setEditing(null);
   }, []);
 
   const goTo = useCallback((next: Section) => {
@@ -236,7 +239,7 @@ export function Dashboard() {
     setSaving(true);
     setModalError("");
     try {
-      const message = await submitModal(modal, form, data);
+      const message = await submitModal(modal, form, data, editing?.id ?? null);
       await refresh();
       setModal(returnTo);
       setReturnTo(null);
@@ -384,6 +387,14 @@ export function Dashboard() {
                     {step.label}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  className="secondary-btn small-btn"
+                  onClick={() => openModal("trip", null, trip)}
+                  title="Edit trip"
+                >
+                  Edit
+                </button>
                 {trip.status !== "cancelled" && trip.status !== "closed" && (
                   <button
                     type="button"
@@ -686,6 +697,14 @@ export function Dashboard() {
                             <div key="actions" className="row-actions">
                               <button
                                 type="button"
+                                className="secondary-btn small-btn"
+                                onClick={() => openModal("truck", null, truck)}
+                                title="Edit vehicle"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
                                 className="danger-btn small-btn"
                                 onClick={() => void archiveTruckHandler(truck)}
                                 title="Remove from fleet"
@@ -721,6 +740,14 @@ export function Dashboard() {
                             {driver.status}
                           </Pill>,
                           <div key="actions" className="row-actions">
+                            <button
+                              type="button"
+                              className="secondary-btn small-btn"
+                              onClick={() => openModal("driver", null, driver)}
+                              title="Edit driver"
+                            >
+                              Edit
+                            </button>
                             <button
                               type="button"
                               className="danger-btn small-btn"
@@ -1068,14 +1095,14 @@ export function Dashboard() {
             <div className="modal-head">
               <div>
                 <p className="eyebrow">NEW RECORD</p>
-                <h2 id="modal-title">{MODAL_TITLES[modal]}</h2>
+                <h2 id="modal-title">{editing ? `Edit ${modal}` : MODAL_TITLES[modal]}</h2>
               </div>
               <button type="button" className="icon-btn" onClick={closeModal} aria-label="Close dialog">
                 <X />
               </button>
             </div>
             <form key={modal} onSubmit={submit} className="modal-form">
-              <ModalFields kind={modal} data={data} needsOverride={needsOverride} onOpen={(kind) => openModal(kind, "trip")} />
+              <ModalFields kind={modal} data={data} needsOverride={needsOverride} initial={editing ?? undefined} onOpen={(kind) => openModal(kind, "trip")} />
               {(modal === "invoice" || modal === "payment") && !data.customers.length && (
                 <p className="form-warning">
                   No customer exists yet. Add one under Customers, or book a trip — a customer typed there is added automatically.
