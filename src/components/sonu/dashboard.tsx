@@ -615,6 +615,15 @@ export function Dashboard() {
                                   <small>{truck.plate}</small>
                                 </div>
                                 <Pill tone={TRUCK_TONE[live] ?? "neutral"}>{TRUCK_STATUS_LABEL[live] ?? live}</Pill>
+                                <button
+                                  type="button"
+                                  className="danger-btn small-btn"
+                                  onClick={() => void archiveTruckHandler(truck)}
+                                  title="Remove vehicle"
+                                  style={{ marginLeft: 8 }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
                               </div>
                             );
                           })}
