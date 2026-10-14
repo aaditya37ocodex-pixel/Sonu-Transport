@@ -140,6 +140,7 @@ export function Dashboard() {
   const [mobileNav, setMobileNav] = useState(false);
   const [modal, setModal] = useState<ModalKind | null>(null);
   const [editing, setEditing] = useState<Record<string, any> | null>(null);
+  const [historyDriver, setHistoryDriver] = useState<{ id: string; name: string } | null>(null);
   const [returnTo, setReturnTo] = useState<ModalKind | null>(null);
   const [modalError, setModalError] = useState("");
   const [needsOverride, setNeedsOverride] = useState(false);
@@ -743,6 +744,14 @@ export function Dashboard() {
                             <button
                               type="button"
                               className="secondary-btn small-btn"
+                              onClick={() => setHistoryDriver({ id: driver.id, name: driver.name })}
+                              title="View trip history"
+                            >
+                              History
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary-btn small-btn"
                               onClick={() => openModal("driver", null, driver)}
                               title="Edit driver"
                             >
@@ -1081,6 +1090,46 @@ export function Dashboard() {
             </span>
           </footer>
         </div>
+
+      {historyDriver && data && (
+        <div className="modal-scrim" onClick={() => setHistoryDriver(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
+            <div className="modal-head">
+              <h2>Trip history — {historyDriver.name}</h2>
+              <button type="button" className="icon-btn" onClick={() => setHistoryDriver(null)} aria-label="Close">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              {(() => {
+                const history = data.trips
+                  .filter((t) => t.driverId === historyDriver.id)
+                  .sort((a, b) => new Date(b.departure).getTime() - new Date(a.departure).getTime());
+                if (!history.length) return <EmptyHint title="No trips yet" detail="This driver has not been assigned to any trips." />;
+                return (
+                  <DataTable
+                    headers={["Trip", "Route", "Departure", "Status", "Freight"]}
+                    numeric={[4]}
+                    rows={history.map((trip) => ({
+                      key: trip.id,
+                      cells: [
+                        <b key="n">{trip.tripNumber}</b>,
+                        `${trip.origin} → ${trip.destination}`,
+                        formatWhen(trip.departure),
+                        <Pill key="s" tone={TRIP_TONE[trip.status] ?? "neutral"}>
+                          {TRIP_STATUS_LABEL[trip.status] ?? trip.status}
+                        </Pill>,
+                        formatInr(trip.freightPaise),
+                      ],
+                    }))}
+                  />
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
       </main>
 
       {modal && data && (
