@@ -42,12 +42,13 @@ function reading(form: FormData) {
 }
 
 /** Sends one form to the server. Resolves to the confirmation message; throws a readable error. */
-export async function submitModal(kind: ModalKind, form: FormData, data: Workspace): Promise<string> {
+export async function submitModal(kind: ModalKind, form: FormData, data: Workspace, editId?: string | null): Promise<string> {
   const { text, amount } = reading(form);
   switch (kind) {
     case "truck": {
       await saveTruck({
         data: {
+          id: editId || undefined,
           name: text("name"),
           plate: text("plate"),
           capacityValue: text("capacity") ? amount("capacity", "capacity") : null,
@@ -56,7 +57,7 @@ export async function submitModal(kind: ModalKind, form: FormData, data: Workspa
           serviceHold: false,
         },
       });
-      return `Truck ${text("plate").toUpperCase()} added. It now appears when you book a trip.`;
+      return editId ? `Truck ${text("plate").toUpperCase()} updated.` : `Truck ${text("plate").toUpperCase()} added. It now appears when you book a trip.`;
     }
     case "customer": {
       await saveCustomer({
@@ -67,6 +68,7 @@ export async function submitModal(kind: ModalKind, form: FormData, data: Workspa
     case "driver": {
       await saveDriver({
         data: {
+          id: editId || undefined,
           name: text("name"),
           phone: text("phone"),
           licenseNo: text("license"),
@@ -75,7 +77,7 @@ export async function submitModal(kind: ModalKind, form: FormData, data: Workspa
           notes: "",
         },
       });
-      return `Driver ${text("name")} added.`;
+      return editId ? `Driver ${text("name")} updated.` : `Driver ${text("name")} added.`;
     }
     case "trip": {
       const departure = text("departure");
@@ -90,6 +92,7 @@ export async function submitModal(kind: ModalKind, form: FormData, data: Workspa
       const newDriver = Boolean(driverName) && !data.drivers.some((row) => !row.archivedAt && norm(row.name) === norm(driverName));
       const result = (await saveTrip({
         data: {
+          id: editId || undefined,
           customerName,
           customerPhone: text("customerPhone"),
           truckId: text("truckId") || null,
@@ -338,21 +341,23 @@ export function ModalFields({
   data,
   needsOverride,
   onOpen,
+  initial,
 }: {
   kind: ModalKind;
   data: Workspace;
   needsOverride: boolean;
   onOpen: (kind: ModalKind) => void;
+  initial?: Record<string, string | number | null | undefined>;
 }) {
   const now = useMemo(() => isoToIstInput(new Date().toISOString()), []);
   const today = now.slice(0, 10);
   if (kind === "truck") {
     return (
       <>
-        <Field label="Truck name" name="name" required autoFocus maxLength={120} placeholder="e.g. Tata 407" />
-        <Field label="Registration number" name="plate" required maxLength={32} placeholder="e.g. MH12 AB 1234" />
-        <Field label="Capacity (tonnes)" name="capacity" type="number" />
-        <Field label="Notes" name="notes" />
+        <Field label="Truck name" name="name" required autoFocus maxLength={120} placeholder="e.g. Tata 407" defaultValue={initial?.name as string} />
+        <Field label="Registration number" name="plate" required maxLength={32} placeholder="e.g. MH12 AB 1234" defaultValue={initial?.plate as string} />
+        <Field label="Capacity (tonnes)" name="capacity" type="number" defaultValue={initial?.capacityValue as string} />
+        <Field label="Notes" name="notes" defaultValue={initial?.notes as string} />
       </>
     );
   }
@@ -369,10 +374,10 @@ export function ModalFields({
   if (kind === "driver") {
     return (
       <>
-        <Field label="Full name" name="name" required autoFocus maxLength={160} />
-        <Field label="Phone number" name="phone" type="tel" maxLength={20} />
-        <Field label="Driving licence number" name="license" maxLength={40} />
-        <Field label="Licence expiry" name="expiry" type="date" />
+        <Field label="Full name" name="name" required autoFocus maxLength={160} defaultValue={initial?.name as string} />
+        <Field label="Phone number" name="phone" type="tel" maxLength={20} defaultValue={initial?.phone as string} />
+        <Field label="Driving licence number" name="license" maxLength={40} defaultValue={initial?.licenseNo as string} />
+        <Field label="Licence expiry" name="expiry" type="date" defaultValue={initial?.licenseExpiry as string} />
       </>
     );
   }
