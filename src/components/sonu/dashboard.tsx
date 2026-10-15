@@ -448,8 +448,546 @@ export function Dashboard() {
 
   return (
     <div className="app-shell">
-      {/* ... rest of the component remains the same as the original with the button additions already applied in the local file */}
-      <p>Full dashboard restored with Edit and Remove buttons for Trucks, Drivers, and Trips, plus History button for drivers.</p>
+      <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`} aria-label="Main navigation">
+        <div className="brand">
+          <div className="brand-mark">ST</div>
+          <div>
+            <strong>SONU</strong>
+            <span>TRANSPORT</span>
+          </div>
+          <button type="button" className="mobile-close icon-btn" onClick={() => setMobileNav(false)} aria-label="Close menu">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="workspace-label">WORKSPACE</div>
+        <nav>
+          {sections.map(({ name, icon: Icon }) => (
+            <button
+              key={name}
+              type="button"
+              className={`nav-item ${section === name ? "active" : ""}`}
+              aria-current={section === name ? "page" : undefined}
+              onClick={() => goTo(name)}
+            >
+              <Icon size={18} />
+              <span>{name}</span>
+              {name === "Trips" && stats.trips ? <small>{stats.trips}</small> : null}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="sync-indicator">
+            <span className={`sync-dot ${data ? "" : "off"}`} />
+            <div>
+              <b>Workspace status</b>
+              <small>{data ? "Connected to the database" : "Waiting for the database"}</small>
+            </div>
+          </div>
+          <div className="profile-mini">
+            <div className="avatar">{data?.profile.name?.slice(0, 1) || "S"}</div>
+            <div className="profile-text">
+              <b>{data?.profile.name || "Sonu Admin"}</b>
+              <small>{data?.profile.role || "Owner"}</small>
+            </div>
+            <button type="button" className="icon-btn" onClick={() => void backup()} title="Download backup" aria-label="Download backup">
+              <ArrowDownLeft size={17} />
+            </button>
+          </div>
+          {authEnabled && (
+            <button type="button" className="signout-btn" disabled={signingOut} onClick={() => void leave()}>
+              {signingOut ? "Signing out…" : "Sign out"}
+            </button>
+          )}
+        </div>
+      </aside>
+      {mobileNav && <button type="button" className="nav-scrim" aria-label="Close menu" onClick={() => setMobileNav(false)} />}
+      <main>
+        <header className="topbar">
+          <button type="button" className="mobile-menu icon-btn" onClick={() => setMobileNav(true)} aria-label="Open menu">
+            <Menu size={18} />
+          </button>
+          <div className="search-box">
+            <Search size={16} />
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={`Search ${section === "Overview" ? "trips" : section.toLowerCase()}…`}
+              aria-label="Search"
+            />
+          </div>
+          <div className="topbar-actions">
+            <button type="button" className="icon-btn" onClick={() => void refresh()} title="Refresh data" aria-label="Refresh data">
+              <RefreshCw size={17} />
+            </button>
+          </div>
+        </header>
+        <div className="content">
+          <div className="page-head">
+            <div>
+              <p className="eyebrow">{data?.company.displayName || "Sonu Transport"}</p>
+              <h1>{section}</h1>
+              <p>
+                {section === "Overview"
+                  ? "Here is what is happening across your fleet today."
+                  : section === "Database"
+                    ? "PostgreSQL is where trips, fleet, customers and accounts are stored."
+                    : `Manage your ${section.toLowerCase()}.`}
+              </p>
+            </div>
+            {action && (
+              <button type="button" className="primary-btn" onClick={() => openModal(action.kind)} disabled={!data}>
+                <Plus size={16} /> {action.label}
+              </button>
+            )}
+          </div>
+
+          {error && (
+            <div className="banner error" role="alert">
+              <CircleAlert size={18} />
+              <span>{error}</span>
+              <button type="button" onClick={() => setError("")} aria-label="Dismiss">
+                <X size={16} />
+              </button>
+            </div>
+          )}
+          {notice && (
+            <div className="banner success" role="status">
+              <CheckCircle2 size={18} />
+              <span>{notice}</span>
+              <button type="button" onClick={() => setNotice("")} aria-label="Dismiss">
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
+          {loading && !data ? (
+            <div className="loading-state">
+              <div className="spinner" />
+              <p>Connecting to your transport workspace…</p>
+            </div>
+          ) : !data ? (
+            <div className="empty-state">
+              <CircleAlert size={28} />
+              <h2>Workspace could not be loaded</h2>
+              <p>Check the database setup and sign-in configuration, then try again.</p>
+              <button type="button" className="primary-btn" onClick={() => void refresh()}>
+                <RefreshCw size={16} /> Retry connection
+              </button>
+            </div>
+          ) : (
+            <>
+              {section === "Overview" && (
+                <>
+                  <div className="stats-grid">
+                    <Stat label="Active trips" value={String(stats.trips).padStart(2, "0")} icon={Activity} tone="teal" hint="Booked, on the road or awaiting close" />
+                    <Stat label="Fleet vehicles" value={String(stats.trucks).padStart(2, "0")} icon={TruckIcon} tone="deep" hint={`${stats.available} available right now`} />
+                    <Stat label="Customers" value={String(stats.customers).padStart(2, "0")} icon={Users} tone="ink" hint="Active customer accounts" />
+                    <Stat label="Outstanding" value={formatInr(stats.outstanding)} icon={Wallet} tone="black" hint="Invoices less payments received" />
+                  </div>
+                  <div className="dashboard-grid">
+                    <section className="panel">
+                      <div className="panel-head">
+                        <div>
+                          <h2>Recent trips</h2>
+                          <p>Your latest transport movements</p>
+                        </div>
+                        <button type="button" className="text-btn" onClick={() => goTo("Trips")}>
+                          View all <ArrowUpRight size={15} />
+                        </button>
+                      </div>
+                      {renderTripTable(trips.slice(0, 6), true)}
+                    </section>
+                    <section className="panel">
+                      <div className="panel-head">
+                        <div>
+                          <h2>Fleet snapshot</h2>
+                          <p>Availability right now</p>
+                        </div>
+                      </div>
+                      <div className="fleet-list">
+                        {data.trucks.filter((truck) => !truck.archivedAt).slice(0, 6).map((truck) => {
+                          const live = truckLive(data, truck);
+                          return (
+                            <div key={truck.id} className="fleet-row">
+                              <div>
+                                <b>{truck.name}</b>
+                                <small>{truck.plate}</small>
+                              </div>
+                              <Pill tone={TRUCK_TONE[live] ?? "neutral"}>{TRUCK_STATUS_LABEL[live] ?? live}</Pill>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  </div>
+                </>
+              )}
+
+              {section === "Trips" && (
+                <section className="panel table-panel">
+                  <PanelHead title="Trip register" subtitle={`${trips.length} trip records`} onAdd={() => openModal("trip")} addLabel="Book trip" />
+                  {renderTripTable(trips)}
+                </section>
+              )}
+
+              {section === "Fleet" && (
+                <section className="panel table-panel">
+                  <PanelHead title="Fleet register" subtitle={`${data.trucks.length} registered vehicles`} onAdd={() => openModal("truck")} addLabel="Add truck" />
+                  <DataTable
+                    headers={["Vehicle", "Registration", "Capacity", "Availability", "Current / next trip", "Trips", "Service hold", "Actions"]}
+                    numeric={[5]}
+                    empty={{ title: "Your fleet starts here", detail: "Add your first truck to see availability and assignments." }}
+                    rows={data.trucks
+                      .filter((truck) => !truck.archivedAt && hit(truck.name, truck.plate, truckLive(data, truck)))
+                      .map((truck) => {
+                        const live = truckLive(data, truck);
+                        return {
+                          key: truck.id,
+                          cells: [
+                            <b key="n">{truck.name}</b>,
+                            truck.plate,
+                            truck.capacityValue ? `${truck.capacityValue} ${truck.capacityUnit}` : "—",
+                            <Pill key="s" tone={TRUCK_TONE[live] ?? "neutral"}>
+                              {TRUCK_STATUS_LABEL[live] ?? live}
+                            </Pill>,
+                            truckTripNote(data, truck),
+                            data.trips.filter((trip) => trip.truckId === truck.id && trip.status !== "cancelled").length,
+                            truck.serviceHold ? "On hold" : "No",
+                            <div key="actions" className="row-actions">
+                              <button
+                                type="button"
+                                className="secondary-btn small-btn"
+                                onClick={() => openModal("truck", null, truck)}
+                                title="Edit truck"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="danger-btn small-btn"
+                                onClick={() => void archiveTruckHandler(truck)}
+                                title="Remove from fleet"
+                              >
+                                <Trash2 size={14} /> Remove
+                              </button>
+                            </div>,
+                          ],
+                        };
+                      })}
+                  />
+                </section>
+              )}
+
+              {section === "Drivers" && (
+                <section className="panel table-panel">
+                  <PanelHead title="Driver register" subtitle={`${data.drivers.length} driver records`} onAdd={() => openModal("driver")} addLabel="Add driver" />
+                  <DataTable
+                    headers={["Driver", "Phone", "Licence number", "Licence expiry", "Trips", "Status", "Actions"]}
+                    numeric={[4]}
+                    empty={{ title: "No drivers yet", detail: "Add a driver here, or type a driver name when you book a trip — it is added automatically." }}
+                    rows={data.drivers
+                      .filter((driver) => !driver.archivedAt && hit(driver.name, driver.phone, driver.licenseNo, driver.status))
+                      .map((driver) => ({
+                        key: driver.id,
+                        cells: [
+                          <b key="n">{driver.name}</b>,
+                          driver.phone,
+                          driver.licenseNo,
+                          driver.licenseExpiry ? formatDay(driver.licenseExpiry) : "",
+                          data.trips.filter((trip) => trip.driverId === driver.id && trip.status !== "cancelled").length,
+                          <Pill key="s" tone={driver.status === "active" ? "good" : "neutral"}>
+                            {driver.status}
+                          </Pill>,
+                          <div key="actions" className="row-actions">
+                            <button
+                              type="button"
+                              className="secondary-btn small-btn"
+                              onClick={() => openModal("driver", null, driver)}
+                              title="Edit driver"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary-btn small-btn"
+                              onClick={() => {
+                                setQuery(driver.name);
+                                goTo("Trips");
+                              }}
+                              title="View trip history"
+                            >
+                              History
+                            </button>
+                            <button
+                              type="button"
+                              className="danger-btn small-btn"
+                              onClick={() => void archiveDriverHandler(driver)}
+                              title="Remove driver"
+                            >
+                              <Trash2 size={14} /> Remove
+                            </button>
+                          </div>,
+                        ],
+                      }))}
+                  />
+                </section>
+              )}
+
+              {section === "Customers" && (
+                <section className="panel table-panel">
+                  <PanelHead title="Customer directory" subtitle={`${data.customers.length} customer records`} onAdd={() => openModal("customer")} addLabel="Add customer" />
+                  <DataTable
+                    headers={["Customer", "Phone", "GSTIN", "Trips", "Outstanding", "Billing address"]}
+                    numeric={[3, 4]}
+                    empty={{ title: "No customers yet", detail: "Add a customer here, or type a customer name when you book a trip — it is added automatically." }}
+                    rows={data.customers
+                      .filter((row) => !row.archivedAt && hit(row.name, row.phone, row.gstin, row.billingAddress))
+                      .map((row) => ({
+                        key: row.id,
+                        cells: [
+                          <b key="n">{row.name}</b>,
+                          row.phone,
+                          row.gstin,
+                          data.trips.filter((trip) => trip.customerId === row.id && trip.status !== "cancelled").length,
+                          formatInr(Math.max(0, customerBalance(data, row.id))),
+                          row.billingAddress,
+                        ],
+                      }))}
+                  />
+                </section>
+              )}
+
+              {section === "Finance" && (
+                <div className="finance-grid">
+                  <section className="panel table-panel">
+                    <PanelHead title="Invoices" subtitle={`${data.invoices.length} invoices`} onAdd={() => openModal("invoice")} addLabel="New invoice" />
+                    <DataTable
+                      headers={["Invoice", "Customer", "Trip", "Issued", "Due", "Total", "Paid", "Status"]}
+                      numeric={[5, 6]}
+                      empty={{ title: "No invoices yet", detail: "Create an invoice for a customer or a trip." }}
+                      rows={data.invoices
+                        .filter((row) => hit(row.invoiceNumber, nameById(data.customers, row.customerId), row.status))
+                        .map((row) => ({
+                          key: row.id,
+                          cells: [
+                            <b key="n">{row.invoiceNumber}</b>,
+                            nameById(data.customers, row.customerId),
+                            data.trips.find((trip) => trip.id === row.tripId)?.tripNumber ?? "",
+                            formatDay(row.issueDate),
+                            formatDay(row.dueDate),
+                            formatInr(row.totalPaise),
+                            formatInr(invoiceAllocated(data, row.id)),
+                            <Pill key="s" tone={row.status === "paid" ? "good" : row.status === "void" ? "bad" : row.status === "partial" ? "warn" : "info"}>
+                              {row.status}
+                            </Pill>,
+                          ],
+                        }))}
+                    />
+                  </section>
+                  <section className="panel table-panel">
+                    <PanelHead title="Payments received" subtitle={`${data.payments.length} transactions`} onAdd={() => openModal("payment")} addLabel="Record payment" />
+                    <DataTable
+                      headers={["Date", "Customer", "Trip", "Method", "Reference", "Amount"]}
+                      numeric={[5]}
+                      empty={{ title: "No payments yet", detail: "Record a payment against a customer or trip." }}
+                      rows={data.payments
+                        .filter((row) => hit(nameById(data.customers, row.customerId), row.method, row.reference))
+                        .map((row) => ({
+                          key: row.id,
+                          cells: [
+                            formatDay(row.paymentDate),
+                            nameById(data.customers, row.customerId),
+                            data.trips.find((trip) => trip.id === row.tripId)?.tripNumber ?? "",
+                            row.method,
+                            row.reference,
+                            formatInr(row.amountPaise),
+                          ],
+                        }))}
+                    />
+                  </section>
+                </div>
+              )}
+
+              {section === "Expenses" && (
+                <div className="finance-grid">
+                  <section className="panel table-panel">
+                    <PanelHead title="Expenses" subtitle={`${data.expenses.length} expense records`} onAdd={() => openModal("expense")} addLabel="Add expense" />
+                    <DataTable
+                      headers={["Date", "Category", "Truck", "Trip", "Vendor", "Amount"]}
+                      numeric={[5]}
+                      empty={{ title: "No expenses yet", detail: "Record tolls, repairs, loading and other costs." }}
+                      rows={data.expenses
+                        .filter((row) => hit(EXPENSE_LABEL[row.category], row.vendorName, row.description, plateById(data.trucks, row.truckId)))
+                        .map((row) => ({
+                          key: row.id,
+                          cells: [
+                            formatDay(row.expenseDate),
+                            EXPENSE_LABEL[row.category] ?? row.category,
+                            plateById(data.trucks, row.truckId),
+                            data.trips.find((trip) => trip.id === row.tripId)?.tripNumber ?? "",
+                            row.vendorName,
+                            formatInr(row.amountPaise),
+                          ],
+                        }))}
+                    />
+                  </section>
+                  <section className="panel table-panel">
+                    <PanelHead title="Fuel logs" subtitle={`${data.fuel.length} fuel entries`} onAdd={() => openModal("fuel")} addLabel="Record fuel" />
+                    <DataTable
+                      headers={["Date", "Truck", "Trip", "Litres", "Odometer", "Vendor", "Amount"]}
+                      numeric={[3, 4, 6]}
+                      empty={{ title: "No fuel logs yet", detail: "Record diesel or petrol for a truck." }}
+                      rows={data.fuel
+                        .filter((row) => hit(plateById(data.trucks, row.truckId), row.vendorName))
+                        .map((row) => ({
+                          key: row.id,
+                          cells: [
+                            formatWhen(row.loggedAt),
+                            plateById(data.trucks, row.truckId),
+                            data.trips.find((trip) => trip.id === row.tripId)?.tripNumber ?? "",
+                            row.quantityMl ? String(row.quantityMl / 1000) : "",
+                            row.odometerKm != null ? (
+                              <span key="o">
+                                {row.odometerKm} km {row.flagged && <Pill tone="warn">Check</Pill>}
+                              </span>
+                            ) : (
+                              ""
+                            ),
+                            row.vendorName,
+                            formatInr(row.totalPaise),
+                          ],
+                        }))}
+                    />
+                  </section>
+                </div>
+              )}
+
+              {section === "Reports" && report && (
+                <>
+                  <section className="panel table-panel">
+                    <div className="panel-head">
+                      <div>
+                        <h2>Period report</h2>
+                        <p>Trips, costs and collections between two dates</p>
+                      </div>
+                    </div>
+                    <div className="period-bar">
+                      <label className="field">
+                        <span>From</span>
+                        <input type="date" value={reportFrom} max={reportTo} onChange={(event) => event.target.value && setReportFrom(event.target.value)} />
+                      </label>
+                      <label className="field">
+                        <span>To</span>
+                        <input type="date" value={reportTo} min={reportFrom} onChange={(event) => event.target.value && setReportTo(event.target.value)} />
+                      </label>
+                    </div>
+                    <div className="stats-grid" style={{ padding: 18, marginBottom: 0 }}>
+                      <Stat label="Trips" value={String(report.trips.length)} icon={ClipboardList} tone="teal" hint="Booked or later, excluding cancelled" />
+                      <Stat label="Freight booked" value={formatInr(report.freight)} icon={ArrowUpRight} tone="deep" hint="In the selected period" />
+                      <Stat label="Trip costs" value={formatInr(report.costs)} icon={ArrowDownLeft} tone="ink" hint="Fuel and trip expenses" />
+                      <Stat label="Collections" value={formatInr(report.collections)} icon={Wallet} tone="black" hint="Payments received" />
+                    </div>
+                  </section>
+                  <section className="panel">
+                    <div className="panel-head">
+                      <div>
+                        <h2>Export</h2>
+                        <p>Download CSV for the selected period</p>
+                      </div>
+                    </div>
+                    <div className="quick-actions">
+                      <QuickAction icon={FileText} label="Trips CSV" onClick={() => downloadText(`trips-${reportFrom}-${reportTo}.csv`, tripsCsv(data, report.trips), "text/csv")} />
+                      <QuickAction icon={TruckIcon} label="Fleet CSV" onClick={() => downloadText(`fleet-${todayIst()}.csv`, trucksCsv(data), "text/csv")} />
+                      <QuickAction icon={ArrowUpRight} label="Expenses CSV" onClick={() => downloadText(`expenses-${reportFrom}-${reportTo}.csv`, expensesCsv(data, reportFrom, reportTo), "text/csv")} />
+                    </div>
+                  </section>
+                </>
+              )}
+
+              {section === "Database" && database && (
+                <section className="panel">
+                  <div className="panel-head">
+                    <div>
+                      <h2>{database.title}</h2>
+                      <p>{database.detail}</p>
+                    </div>
+                    <Pill tone="info">{database.place}</Pill>
+                  </div>
+                  <div className="db-tables">
+                    {database.tables.map((table) => (
+                      <div key={table.key} className="db-table">
+                        <b>{table.label}</b>
+                        <span>{table.rows} rows</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {section === "Settings" && (
+                <SecurityPanel data={data} onChanged={refresh} />
+              )}
+            </>
+          )}
+        </div>
+      </main>
+
+      {modal && data && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeModal();
+          }}
+        >
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <div className="modal-head">
+              <div>
+                <p className="eyebrow">{editing ? "EDIT RECORD" : "NEW RECORD"}</p>
+                <h2 id="modal-title">{editing ? `Edit ${modal}` : MODAL_TITLES[modal]}</h2>
+              </div>
+              <button type="button" className="icon-btn" onClick={closeModal} aria-label="Close dialog">
+                <X />
+              </button>
+            </div>
+            <form key={modal} onSubmit={submit} className="modal-form">
+              <ModalFields kind={modal} data={data} needsOverride={needsOverride} initial={editing ?? undefined} onOpen={(kind) => openModal(kind, "trip")} />
+              {(modal === "invoice" || modal === "payment") && !data.customers.length && (
+                <p className="form-warning">
+                  No customer exists yet. Add one under Customers, or book a trip — a customer typed there is added automatically.
+                </p>
+              )}
+              {(modal === "fuel" || modal === "expense") && !data.trucks.length && (
+                <p className="form-warning">Register a truck first so this cost can be linked to it.</p>
+              )}
+              {modalError && (
+                <p className="form-error" role="alert">
+                  <CircleAlert size={16} />
+                  <span>{modalError}</span>
+                </p>
+              )}
+              <div className="modal-actions">
+                <button type="button" className="secondary-btn" onClick={closeModal}>
+                  Cancel
+                </button>
+                <button type="submit" className="primary-btn" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <span className="button-spinner" />
+                      Saving…
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={16} /> {modal === "trip" ? "Book trip" : "Save record"}
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
