@@ -100,7 +100,6 @@ export async function submitModal(kind: ModalKind, form: FormData, data: Workspa
           driverPhone: text("driverPhone"),
           origin: text("origin"),
           destination: text("destination"),
-          // Date and time are sent exactly as typed (business time, IST) — the server reads them in IST.
           departure,
           arrival,
           goods: text("goods"),
@@ -116,7 +115,9 @@ export async function submitModal(kind: ModalKind, form: FormData, data: Workspa
       const extras = [newCustomer && `customer ${customerName} added to Customers`, newDriver && `driver ${driverName} added to Drivers`]
         .filter(Boolean)
         .join(" and ");
-      return `Trip ${result.tripNumber ?? ""} booked${extras ? `; ${extras}` : ""}.`.replace("Trip  booked", "Trip booked");
+      return editId
+        ? `Trip ${result.tripNumber ?? ""} updated${extras ? `; ${extras}` : ""}.`.replace("Trip  updated", "Trip updated")
+        : `Trip ${result.tripNumber ?? ""} booked${extras ? `; ${extras}` : ""}.`.replace("Trip  booked", "Trip booked");
     }
     case "expense": {
       await saveExpense({
@@ -185,12 +186,13 @@ export async function submitModal(kind: ModalKind, form: FormData, data: Workspa
 
 const activeTrucks = (data: Workspace) => data.trucks.filter((row) => !row.archivedAt);
 
-function TruckSelect({ data, required, label = "Truck" }: { data: Workspace; required?: boolean; label?: string }) {
+function TruckSelect({ data, required, label = "Truck", defaultValue }: { data: Workspace; required?: boolean; label?: string; defaultValue?: string | null }) {
   return (
     <SelectField
       label={label}
       name="truckId"
       required={required}
+      defaultValue={defaultValue || ""}
       options={activeTrucks(data).map((row) => [row.id, `${row.name} · ${row.plate}`])}
     />
   );
@@ -203,19 +205,19 @@ function TripSelect({ data, customerId, label = "Trip (optional)" }: { data: Wor
   return <SelectField label={label} name="tripId" options={trips} />;
 }
 
-function TripFields({ data, needsOverride, onOpen }: { data: Workspace; needsOverride: boolean; onOpen: (kind: ModalKind) => void }) {
-  const departureDefault = useMemo(() => isoToIstInput(new Date().toISOString()), []);
+function TripFields({ data, needsOverride, onOpen, initial }: { data: Workspace; needsOverride: boolean; onOpen: (kind: ModalKind) => void; initial?: Record<string, any> }) {
+  const departureDefault = useMemo(() => initial?.departure ? isoToIstInput(initial.departure) : isoToIstInput(new Date().toISOString()), [initial]);
   const trucks = activeTrucks(data);
   return (
     <>
       <p className="form-section">Customer and driver — type the names</p>
       <div className="form-row">
-        <Field label="Customer name" name="customerName" required list="customer-names" placeholder="Type the customer name" autoFocus maxLength={160} />
-        <Field label="Customer phone (optional)" name="customerPhone" type="tel" maxLength={20} placeholder="For a new customer" />
+        <Field label="Customer name" name="customerName" required list="customer-names" placeholder="Type the customer name" autoFocus maxLength={160} defaultValue={initial?.customerName as string} />
+        <Field label="Customer phone (optional)" name="customerPhone" type="tel" maxLength={20} placeholder="For a new customer" defaultValue={initial?.customerPhone as string} />
       </div>
       <div className="form-row">
-        <Field label="Driver name (optional)" name="driverName" list="driver-names" placeholder="Type the driver name" maxLength={160} />
-        <Field label="Driver phone (optional)" name="driverPhone" type="tel" maxLength={20} placeholder="For a new driver" />
+        <Field label="Driver name (optional)" name="driverName" list="driver-names" placeholder="Type the driver name" maxLength={160} defaultValue={initial?.driverName as string} />
+        <Field label="Driver phone (optional)" name="driverPhone" type="tel" maxLength={20} placeholder="For a new driver" defaultValue={initial?.driverPhone as string} />
       </div>
       <datalist id="customer-names">
         {data.customers
@@ -233,7 +235,7 @@ function TripFields({ data, needsOverride, onOpen }: { data: Workspace; needsOve
       </datalist>
 
       <p className="form-section">Truck and route</p>
-      <TruckSelect data={data} required />
+      <TruckSelect data={data} required defaultValue={initial?.truckId as string} />
       {!trucks.length && (
         <p className="form-warning">
           No truck is registered yet. A truck you add appears in this list straight away.{" "}
@@ -243,21 +245,21 @@ function TripFields({ data, needsOverride, onOpen }: { data: Workspace; needsOve
         </p>
       )}
       <div className="form-row">
-        <Field label="Pickup" name="origin" required maxLength={160} />
-        <Field label="Destination" name="destination" required maxLength={160} />
+        <Field label="Pickup" name="origin" required maxLength={160} defaultValue={initial?.origin as string} />
+        <Field label="Destination" name="destination" required maxLength={160} defaultValue={initial?.destination as string} />
       </div>
       <div className="form-row">
         <Field label="Departure (IST)" name="departure" type="datetime-local" required defaultValue={departureDefault} />
-        <Field label="Expected arrival (optional)" name="arrival" type="datetime-local" />
+        <Field label="Expected arrival (optional)" name="arrival" type="datetime-local" defaultValue={initial?.arrival ? isoToIstInput(initial.arrival as string) : ""} />
       </div>
       <div className="form-row">
-        <Field label="Goods" name="goods" maxLength={300} />
-        <Field label="Weight (tonnes)" name="weight" type="number" />
+        <Field label="Goods" name="goods" maxLength={300} defaultValue={initial?.goods as string} />
+        <Field label="Weight (tonnes)" name="weight" type="number" defaultValue={initial?.weight as string} />
       </div>
 
       <p className="form-section">Money</p>
       <div className="form-row">
-        <Field label="Freight (₹)" name="freight" type="number" required />
+        <Field label="Freight (₹)" name="freight" type="number" required defaultValue={initial?.freight as string} />
         <Field label="Advance received (₹)" name="advance" type="number" hint="Optional. Recorded as a payment against this trip." />
       </div>
       {needsOverride && (
@@ -381,7 +383,7 @@ export function ModalFields({
       </>
     );
   }
-  if (kind === "trip") return <TripFields data={data} needsOverride={needsOverride} onOpen={onOpen} />;
+  if (kind === "trip") return <TripFields data={data} needsOverride={needsOverride} onOpen={onOpen} initial={initial} />;
   if (kind === "expense") {
     return (
       <>
