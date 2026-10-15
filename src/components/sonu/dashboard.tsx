@@ -1,1 +1,1 @@
-PLACEHOLDER
+$(cat /tmp/dashboard-new.tsx)
